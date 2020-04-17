@@ -1,8 +1,4 @@
-function [debug,image] = pL0(resImg, nImg, posSens, posRecs, image, Ascans, speedAscan, pixDensity, useless, debugOn)
-debug = NaN;
-if debugOn == true
-    debug = (zeros(resImg,resImg,resImg));
-end
+function image = pL0(resImg, nImg, posSens, posRecs, image, Ascans, speedAscan, pixDensity, useless)
 
 cube = zeros(resImg,resImg,resImg,3);    %Eine Cube mit Koordinaten
 cube(:,:,:,1) = repmat([pixDensity:pixDensity:(resImg)*pixDensity]', [1, resImg, resImg]);
@@ -17,9 +13,6 @@ for i = 1:nImg
     posRec3D = cat(4,posRec(1),posRec(2),posRec(3));
     
     cubeDisGes = sqrt(sum(((posSen3D(ones(resImg,1),ones(resImg,1),ones(resImg,1),:))-cube).^2,4)) + sqrt(sum((cube - (posRec3D(ones(resImg,1),ones(resImg,1),ones(resImg,1),:))).^2,4));
-    if debugOn == true
-        debug = cubeDisGes;
-    end
     image = image + Ascan(round(cubeDisGes*speedAscan));
 end
 end
