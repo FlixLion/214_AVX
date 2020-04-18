@@ -1,5 +1,4 @@
-function disges = L3sbDebug(res, count, Ascans, speed, int, posSens, posRecs, data, img_start, resint)
-disges = single(zeros(res,res,res,count));
+function data = L3sb(res, count, Ascans, speed, int, posSens, posRecs, data, img_start, resint)
 for i=1:count
     ascan = Ascans(:,i);
     senderpos = posSens(i,:);
@@ -17,7 +16,6 @@ for i=1:count
                 ascanpos = round((dges/speed)/int);
                 data(x,y,z) = data(x,y,z) + ascan(ascanpos); %Berechnung eines der Einzelbilder und zusammenfügen mit den vorherigen
                 %Einzelbildern
-                disges(x,y,z,i) = dges;
             end
         end
     end

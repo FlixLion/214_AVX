@@ -1,5 +1,4 @@
-function disges = L2sbDebug(res, count, Ascans, speed, int, posSens, posRecs, data, img_start, resint)
-disges = single(zeros(res,res,res,count));
+function data = L2sb(res, count, Ascans, speed, int, posSens, posRecs, data, img_start, resint)
 pixelposz = single(zeros(res,1));
 for num=1:res
     pixelposz(num) = num*resint;
@@ -29,7 +28,6 @@ for i=1:count
             ascanpos = round((dges/speed)/int);
             ascantmp(1,1,:) = ascan(ascanpos);
             data(x,y,:) = data(x,y,:) + ascantmp(1,1,:);
-            disges(x,y,:,i) = dges;
         end
     end
     
