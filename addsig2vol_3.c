@@ -66,7 +66,7 @@ __declspec(dllimport) __imp_pthread_create();
 //#undef addsig2vol_debug
         
 // enable/disable pthreads
-#define p_threads
+//#define p_threads
 
 //enable/disable C-CODE version (disabled is Asm-code)
 #undef C_CODE
