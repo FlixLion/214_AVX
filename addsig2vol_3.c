@@ -63,13 +63,13 @@ __declspec(dllimport) __imp_pthread_create();
 
 //enable/disable debugging output
 #define addsig2vol_debug
-//#undef addsig2vol_debug
+#undef addsig2vol_debug
         
 // enable/disable pthreads
 //#define p_threads
 
 //enable/disable C-CODE version (disabled is Asm-code)
-#undef C_CODE
+//#undef C_CODE
 
 #ifdef p_threads
 #include "pthread.h"
