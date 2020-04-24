@@ -27,7 +27,9 @@ resImgMix = single([100]);
 
 leonCodes = {@L0sb,@L1sb,@L2sb,@L3sb};
 paulCodes = {@pL0, @pL1, @pL2, @pL3};
-addsigCodes = {@addsig2vol_3};
+leonCodes = {};
+paulCodes = {};
+addsigCodes = {@addsig2vol_3_ASM_MT, @addsig2vol_3_C, @addsig2vol_3_C_MT};
 
 for i=1:size(addsigCodes)
    addsigCodes{i}(4); %Anzahl der Threads festlegen. (Geht auch ohne, dauert dann aber)
@@ -43,7 +45,7 @@ for i = size(leonCodes,2)+1:size(paulCodes,2)+size(leonCodes,2)
     codeNames(i) = func2str(paulCodes{i-size(leonCodes,2)});
 end
 for i = size(leonCodes,2)+1+size(paulCodes,2):size(paulCodes,2)+size(leonCodes,2)+size(addsigCodes,2)
-    codeNames(i) = func2str(paulCodes{i-size(leonCodes,2)-size(addsigCodes,2)});
+    codeNames(i) = func2str(addsigCodes{i-size(leonCodes,2)-size(paulCodes,2)});
 end
 
 for i = 1:repeats
