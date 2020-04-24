@@ -21,10 +21,12 @@ stepResImg3 = 50;
 resImgMix = [stepResImg:stepResImg:NResImg * stepResImg, NResImg * stepResImg + stepResImg2:stepResImg2:NResImg2 * stepResImg2, NResImg2 * stepResImg2 + stepResImg3:stepResImg3:700];
 resImgMix = (100);
 
+
+addsigCode = {@addsig2vol_3};
 leonCodes = {@L0sb,@L1sb,@L2sb,@L3sb};
 paulCodes = {@pL0, @pL1, @pL2, @pL3};
-allCodes = [leonCodes, paulCodes];
-nCodes = size(leonCodes,2) + size(paulCodes,2);
+allCodes = [leonCodes, paulCodes, addsigCode];
+nCodes = size(leonCodes,2) + size(paulCodes,2) + size(addsigCode,2);
 codeNames = string.empty;
 codeAufzahlung = string.empty;
 for i = 1:size(allCodes,2)
@@ -87,7 +89,30 @@ for i = 1:size(resImgMix,2)
         Ascans(:,x) = Ascan;
     end
     
+    x=resImg;
+
     fprintf('--- Res: %g(%g)/%g(%g) ---\n',resImgMix(i), i, resImgMix(end), size(resImgMix,2));
+    for c = 1
+        for n = 1:repeats
+            for Nimg = 1:NnImg
+%                 try
+                    fprintf(func2str(addsigCode{c}));
+                    tic;
+                    images(:,:,:,c+size(leonCodes,2) + size(paulCodes,2)) = addsigCode{c}(Ascans(:,Nimg),single(reshape(img_start,3,1)),single(reshape(posRecs(Nimg,:),3,1)),single(reshape(posSens(Nimg,:),3,1)),single(speed),single(resImg),single(intAscan),uint32([x,x,x]),images(:,:,:,c+nCodes));
+%                     images(:,:,:,c+size(leonCodes,2) + size(paulCodes,2)) = zeros(resImgMix(i),resImgMix(i),resImgMix(i)); %addsigCode{c}(Ascans(:,Nimg),single(reshape(img_start,3,1)),single(reshape(posRecs(Nimg,:),3,1)),single(reshape(posSens(Nimg,:),3,1)),single(speed),single(resImg),single(intAscan),uint32([x,x,x]),images(:,:,:,c+nCodes));
+                    
+                    times(n,i,c+size(leonCodes,2) + size(paulCodes,2)) = toc;
+                    fprintf([' in ',num2str(times(n,i,c+size(leonCodes,2) + size(paulCodes,2))),' Sekunden\n']);
+%                 catch e
+%                     times(n,i,c+size(leonCodes,2) + size(paulCodes,2)) = NaN;
+%                     fprintf(' CRASHED\n');
+%                     fprintf(1,'The identifier was:\n%s',e.identifier);
+%                     fprintf(1,'\n%s',e.message);
+%                 end
+            end
+        end
+    end
+    
     for c = 1:size(leonCodes,2)
         for n = 1:repeats
             try
@@ -111,6 +136,7 @@ for i = 1:size(resImgMix,2)
             try
                 fprintf(func2str(paulCodes{c}));
                 tic;
+                
                 images(:,:,:,c+size(leonCodes,2)) = paulCodes{c}(resImg, NnImg, posRecs, posSens, image, Ascans, speedAscan, pixDensity, invPixDensity);
                 times(n,i,c+size(leonCodes,2)) = toc;
                 fprintf([' in ',num2str(times(n,i,c+size(leonCodes,2))),' Sekunden\n']);
