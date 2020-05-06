@@ -23,17 +23,20 @@ stepResImg = 10; %resImg Stepsize
 stepResImg2 = 20; %resImg Stepsize
 stepResImg3 = 50;
 resImgMix = [stepResImg:stepResImg:NResImg * stepResImg, NResImg * stepResImg + stepResImg2:stepResImg2:NResImg2 * stepResImg2, NResImg2 * stepResImg2 + stepResImg3:stepResImg3:700];
-resImgMix = single([100]);
+resImgMix = single([200]);
 
 leonCodes = {@L0sb,@L1sb,@L2sb,@L3sb};
 paulCodes = {@pL0, @pL1, @pL2, @pL3};
 leonCodes = {};
 paulCodes = {};
-addsigCodes = {@addsig2vol_3_ASM_MT, @addsig2vol_3_C, @addsig2vol_3_C_MT};
+%addsigCodes = {@addsig2vol_3_C, @addsig2vol_3_ASM, @addsig2vol_3_C_MT, @addsig2vol_3_ASM_MT};
+addsigCodes = {@addsig2vol_3};
 
-for i=1:size(addsigCodes)
-   addsigCodes{i}(4); %Anzahl der Threads festlegen. (Geht auch ohne, dauert dann aber)
-end
+addsigCodes{1}(4);
+%addsigCodes{2}(1);
+% addsigCodes{3}(4);
+% addsigCodes{4}(4);
+
 
 nCodes = size(leonCodes,2) + size(paulCodes,2) + size(addsigCodes,2);
 codeNames = string.empty;

@@ -66,7 +66,8 @@ __declspec(dllimport) __imp_pthread_create();
 #undef addsig2vol_debug
         
 // enable/disable pthreads
-//#define p_threads
+#define p_threads
+#undef p_threads
 
 //enable/disable C-CODE version (disabled is Asm-code)
 //#undef C_CODE
@@ -254,9 +255,9 @@ void mexFunction (int nlhs, mxArray*plhs[],
     case 1:
         if (((int)*((double*)mxGetPr(prhs[0]))<=NUMCORES) & ((int)*((double*)mxGetPr(prhs[0]))>=1))
         {
+            mexPrintf("%i",(int)NUMCORES);
             mexPrintf("Clear Benchmark results, manual set used Cores to %i\n", (int)*((double*)mxGetPr(prhs[0])));
             nCores_bench = (uint32_t) ceil(*((double*)mxGetPr(prhs[0])));
-            
             //fill 
             for (i=NUMCORES;i>0;i--)
             { throughput[i-1]=1;
@@ -264,8 +265,11 @@ void mexFunction (int nlhs, mxArray*plhs[],
             }
             throughput[nCores_bench-1]=299;
             latency[nCores_bench-1]=1;
+            
+            mexPrintf("%i",(int)NUMCORES);
         }
 		break;
+        
 	case 9:
     
     //init variables
@@ -305,7 +309,8 @@ void mexFunction (int nlhs, mxArray*plhs[],
     //fpu_status
      fpu_check();
 	 #endif
-                
+    mexPrintf("nCores_bench ist:%i",(int)nCores_bench); 
+    mexPrintf("NUMCORES ist:%i",(int)NUMCORES);    
 	 ////benchmark of performance, selecting number of threads
     if (nCores_bench==-1) as2v_bench(&throughput[0], &latency[0]); 
     
@@ -537,7 +542,6 @@ void mexFunction (int nlhs, mxArray*plhs[],
 
 	return;
 }
-
 
 
 //////////////////////////////////////////////////////////////////////////////////
