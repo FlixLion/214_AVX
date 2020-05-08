@@ -30,12 +30,12 @@ paulCodes = {@pL0, @pL1, @pL2, @pL3};
 leonCodes = {};
 paulCodes = {};
 %addsigCodes = {@addsig2vol_3_C, @addsig2vol_3_ASM, @addsig2vol_3_C_MT, @addsig2vol_3_ASM_MT};
-addsigCodes = {@addsig2vol_3};
+addsigCodes = {@addsig2vol_3_ASM_MT, @addsig2vol_3_ASM, @addsig2vol_3_C_MT, @addsig2vol_3_C};
 
 addsigCodes{1}(4);
-%addsigCodes{2}(1);
-% addsigCodes{3}(4);
-% addsigCodes{4}(4);
+addsigCodes{2}(1);
+addsigCodes{3}(4);
+addsigCodes{4}(1);
 
 
 nCodes = size(leonCodes,2) + size(paulCodes,2) + size(addsigCodes,2);
