@@ -67,10 +67,11 @@ __declspec(dllimport) __imp_pthread_create();
         
 // enable/disable pthreads
 #define p_threads
-#undef p_threads
+//#undef p_threads
 
 //enable/disable C-CODE version (disabled is Asm-code)
-//#undef C_CODE
+#define C_CODE
+#undef C_CODE
 
 #ifdef p_threads
 #include "pthread.h"
