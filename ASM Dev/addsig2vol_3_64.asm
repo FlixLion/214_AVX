@@ -3,6 +3,12 @@ default rel
 global	as2v_complex
 global	_as2v_complex
 
+global	as2v_complex_sm
+global	_as2v_complex_sm
+
+global	xsum_complex
+global	_xsum_complex
+
 
 ;addsig2vol_2(zeros(3000,2),single(zeros(3,1)),single(zeros(3,1)),single(zeros(3,1)),single(zeros(1,1),single(zeros(1,1),single(zeros(3,1),uint32([10 10 10]),zeros([10 10 10]))  );
 ;addsig2vol_2(repmat([1:3000]',[1 2]),single(ones(3,1)),single(ones(3,2)),single(ones(3,1)),single(ones(1,1)),single(ones(1,1)),single(ones(3,1)),uint32([10 10 10]),zeros([10 10 10])  );
@@ -10,7 +16,6 @@ global	_as2v_complex
 [segment .data align=16]
 ;;;;variables
 	WIDTH_BUFFER dd 0
-	MASK_BUFFER dd 4294967295
 	RSP_SAVE dq 0
 
 	
@@ -45,11 +50,13 @@ global	_as2v_complex
 ;92=                  ->  *IMAGE_SUM	      -> nAscan	rcx+120
 ;96=                  ->  *IMAGE_SUM_compl  -> n_pixX	rcx+124
 ;100=                 ->  quadwordbuffer    -> NULL 	rcx+128
-	
+;                     ->  quadwordbuffer    -> NULL 	rcx+132
+;                     ->  quadwordbuffer    -> NULL 	rcx+136
+;                     ->  quadwordbuffer    -> NULL 	rcx+140
     
 
-as2v_complex:	
-_as2v_complex:
+xsum_complex:	
+_xsum_complex:
 
 	
 	push rbp
@@ -57,20 +64,21 @@ _as2v_complex:
 	push rdi
 	push rbx	 ;+12 (diff:esp+8)
 
-	;push eax	 ;buffer for width  +8 (diff esp+12)
-	;push eax	 ;buffer for CTW    +4 (diff esp+16)
- 
-
-	;save rsp
-	mov [rel RSP_SAVE],qword rsp
+	;;;save rsp
+	;mov [rel RSP_SAVE],qword rsp
+	mov rsi, rsp
 	
-	
-	;save XMM6-7 (callee convention WIN64(?))
-	movups [rel XMM6_SAVE],xmm6
-	movups [rel XMM7_SAVE],xmm7
+	;;;save XMM6-7 (callee convention WIN64(?))
+	;movups [rel XMM6_SAVE],xmm6
+	;movups [rel XMM7_SAVE],xmm7
 
 	;transfer via rcx because first parameter on MS-64 convention and 4. on linux,so pass the pointer as 1. & 4. 
 	mov rsp,rcx
+
+  ;;Save rsp
+  mov [rsp+136], rsi
+
+
 
  	fninit		 ;init fpu
 
@@ -150,7 +158,7 @@ _as2v_complex:
 
      ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      ;;;Xsum path
-	mov dword [rel WIDTH_BUFFER],eax   ;width buffer
+	mov dword [rsp+128],eax   ;width buffer
 
      xsum:
 	mov rbx,[rsp+24]  ;*Buffer
@@ -330,7 +338,7 @@ _as2v_complex:
 
      ;create buffer complex
      buff_complex1:
-	mov ecx,[rel WIDTH_BUFFER]   ;Width
+	mov ecx,[rsp+128]   ;Width
 	mov rbx,[rsp+40]  ;*Buffer_complex
 	mov rdx,[rsp+88]  ;*AScan_complex
 
@@ -341,7 +349,7 @@ _as2v_complex:
 	dec ecx
 	jnz b0_c	  ;AScan[width]
 
-	mov ecx,[rel WIDTH_BUFFER]   ;Width
+	mov ecx,[rsp+128]   ;Width
 	fst qword [rbx]   ;buffer[0]
 
       b1_c:
@@ -355,14 +363,14 @@ _as2v_complex:
 
 	mov rax,rdx	  ; rdx ->vorauseilend um width
 	xor rcx,rcx ; clear RCX for later mixed 32-64 bit add
-	mov ecx,[rel WIDTH_BUFFER]   ; width
+	mov ecx,[rsp+128]   ; width
 	shl ecx,4	  ;imul ecx,16       ; 2*width ->addr
 	add ecx,8
 	sub rax,rcx	  ;hinterher um 2*width +1
 
 	mov ecx,[rsp+120]  ;n_AScan
-	sub ecx,[rel WIDTH_BUFFER]   ; -width
-	sub ecx,[rel WIDTH_BUFFER]   ; -width
+	sub ecx,[rsp+128]   ; -width
+	sub ecx,[rsp+128]   ; -width
 	sub ecx,1	  ;n_AScan-2*Width-1
 
 	mov rbp,8
@@ -378,7 +386,7 @@ _as2v_complex:
 	add rax,rbp
 	add rbx,rbp
 
-	mov ecx,[rel WIDTH_BUFFER]   ;width
+	mov ecx,[rsp+128]   ;width
       b3_c:
 	add rax,8	  ;hinterher
 	fsub qword [rax]
@@ -732,12 +740,56 @@ _as2v_complex:
     jmp fill_real_bild
     ;;;;;;;;;;;;;;end interpol
 
-
- 
-
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;fill images
     ;;;;;;;;;;;;;;;;;;;;;;;;;
     fill_real_bild:
+
+
+	;recover XMM6-7 (callee convention WIN64(?))
+	;movups xmm7,[rel XMM7_SAVE]
+	;movups xmm6,[rel XMM6_SAVE]
+
+	;;;;;clean up
+	;mov rsp, [rel RSP_SAVE]
+  mov rsp,[rsp+136]
+
+	pop rbx
+	pop rdi
+	pop rsi
+	pop rbp
+
+    
+	ret
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;BILD
+
+as2v_complex:	
+_as2v_complex:
+
+	
+	push rbp
+	push rsi
+	push rdi
+	push rbx	 ;+12 (diff:esp+8)
+
+	;;;save rsp
+	;mov [rel RSP_SAVE],qword rsp
+	mov rsi, rsp
+	
+	;;;save XMM6-7 (callee convention WIN64(?))
+	;movups [rel XMM6_SAVE],xmm6
+	;movups [rel XMM7_SAVE],xmm7
+
+	;transfer via rcx because first parameter on MS-64 convention and 4. on linux,so pass the pointer as 1. & 4. 
+	mov rsp,rcx
+
+  ;;Save rsp
+  mov [rsp+136], rsi
+
+
+ 	fninit		 ;init fpu
+
 
     ;init mm7 with zero
     ;mov eax,0           ;
@@ -791,14 +843,13 @@ _as2v_complex:
 
     mulss xmm2,xmm1	 ;3000*5 ->15000
     cvtss2si eax,xmm2;
-    mov dword [rel WIDTH_BUFFER],eax ;15000
+    mov dword [rsp+128],eax ;15000
     unpcklps xmm3,xmm2	 ;xmm3 = t,t,15000,-1
     shufps xmm4,xmm3,68  ;0100 0100b -> xmm4 = 15000,-1,factor,resolut
     
     ;;;create complete factor buffer
     movaps xmm8,xmm4
 	  shufps xmm8,xmm8,85  ;    0101 0101b -> factor,factor,factor,factor
-	  vinsertf128 ymm8,ymm8,xmm8,1 ; -> factor,factor,factor,factor
     
     ;;; create 2*resolut buffer
     movss  xmm10,xmm4    ;    t,t,t,resolut
@@ -813,14 +864,11 @@ _as2v_complex:
     ;;;fillup pointer to data
     mov rsi,[rsp+88]	 ; *ascan_complex (if not existent = NULL = 0)
  
-    mov r10,[rsp+32]  ;*pixelpos
+    mov r10,[rsp+32]   ;*pixelpos
     mov r11,[rsp+24]	;*buffer_real[index_aktual]               NP
 	  mov r12,[rsp+96]	;*image_sum_real
     mov r13,[rsp+0]	  ;*bild_real
      
-    movss  xmm15,[rel MASK_BUFFER];	 xmm15 = ffffffffh
-    shufps xmm15,xmm15,0   ;0 -> xmm15 = 4x ffffffffh
-    
     
     ;;delta Counter
     mov rbp,0		 ; delta IMAGE
@@ -851,7 +899,6 @@ _as2v_complex:
        shufps xmm2,xmm2,238 ;11101110b-> t,t,z_s,z_r            psrldq xmm2,8        ;SSE2 shift right by BYTES not BITS! t,t,z_s,z_r
        addps  xmm3,xmm2     ;     (t,t,z_s,z_r) + (t,t,y_s,y_r)  -> t,t,S,R
        unpcklps xmm3,xmm3   ;     S,S,R,R  ;!!!!shufps xmm3,xmm3,68  ;     0100 0100b -> S,R,S,R    ;
-	   vinsertf128 ymm3,ymm3,xmm3,1
 
        X_loop_init:
    mov ecx,[rsp+124]     ;    n_pixX
@@ -869,77 +916,64 @@ _as2v_complex:
       movaps xmm9,xmm2
       addps  xmm9,xmm10    ;    x_p1,x_p0,x_p1,x_p0+ 2*resolut ->  x_p3,x_p2,x_p3,x_p2 
 
-	  vinsertf128 ymm2,ymm2,xmm9,1 ; x_p0,x_p0,x_p0,x_p1,x_p3,x_p2,x_p3,x_p2 
-	  
 	 ;x_r &  x_s
 	 movss xmm1,xmm6      ;    receiver (trash),z_r,y_r,x_r
 	 shufps xmm1,xmm5,0   ;    sender; 0000 0000b -> S,S,R,R
-	 
-	 vinsertf128 ymm1,ymm1,xmm1, 1 ; -> S,S,R,R,S,S,R,R
 
-		;subps xmm2,xmm1      ;    x_p-x_r, x_p-x_s -> S1,S0,R1,R0St
+	 subps xmm2,xmm1      ;    x_p-x_r, x_p-x_s -> S1,S0,R1,R0
       ;PIPE2
-		;subps xmm9,xmm1      ;    x_p-x_r, x_p-x_s -> S3,S2,R3,R2
-	vsubps ymm2,ymm2,ymm1 	;	x_p-x_r, x_p-x_s -> S1,S0,R1,R0,S3,S2,R3,R2
-		;mulps xmm2,xmm2      ;    quadrieren
+      subps xmm9,xmm1      ;    x_p-x_r, x_p-x_s -> S3,S2,R3,R2
+	 mulps xmm2,xmm2      ;    quadrieren
       ;PIPE2
-		;mulps xmm9,xmm9      ;    quadrieren
-	 vmulps ymm2,ymm2,ymm2 	;	quadrieren
-		;addps xmm2,xmm3      ;    S1x,S0x,R1x,R0x + Syz,Syz,Ryz,Ryz
+      mulps xmm9,xmm9      ;    quadrieren
+	 
+	 addps xmm2,xmm3      ;    S1x,S0x,R1x,R0x + Syz,Syz,Ryz,Ryz
       ;PIPE2
-		;addps xmm9,xmm3      ;    S1x,S0x,R1x,R0x + Syz,Syz,Ryz,Ryz
-	vaddps ymm2,ymm2,ymm3	;	S1x,S0x,R1x,R0x,S3x,S2x,R3x,R2x + Syz,Syz,Ryz,Ryz,Syz,Syz,Ryz,Ryz
-		;sqrtps xmm2,xmm2     ;    sqrt
+      addps xmm9,xmm3      ;    S1x,S0x,R1x,R0x + Syz,Syz,Ryz,Ryz
+	 sqrtps xmm2,xmm2     ;    sqrt
+   ;rsqrtps xmm2,xmm2     ;    reziprok. sqrt approx.
+   ;rcpps xmm2,xmm2     ;   
+
       ;PIPE2
-		;sqrtps xmm9,xmm9     ;    sqrt
-	vsqrtps ymm2,ymm2	;	sqrt
-		
-		;movaps xmm1,xmm2     ;
-	vmovaps ymm1,ymm2
-		;shufps xmm1,xmm1,254 ;    1111 1110b -> S1,S1,S1,S0
-	vshufps ymm1,ymm1,254	;	1111 1110b -> S1,S1,S1,S0,S3,S3,S3,S2
-		;addps xmm2,xmm1     ;    S1,S0,R1,R0 +  S1,S1,S1,S0 = t,t,P1,P0
-	vaddps ymm2,ymm2,ymm1 ; 	t,t,P1,P0,t,t,P3,P2
+      sqrtps xmm9,xmm9     ;    sqrt
+      ;rsqrtps xmm9,xmm9     ;    reziprok. sqrt approx.
+      ;rcpps xmm9,xmm9     ;   
+
+
+	 movaps xmm1,xmm2     ;
+	 shufps xmm1,xmm1,254 ;    1111 1110b -> S1,S1,S1,S0
+	 addps xmm2,xmm1     ;    S1,S0,R1,R0 +  S1,S1,S1,S0 = t,t,P1,P0
 	 
        ;PIPE2
-		;movaps xmm11,xmm9     ;
-		;shufps xmm11,xmm11,254 ;    1111 1110b -> S3,S3,S3,S2
-		;addps xmm9,xmm11     ;    S3,S2,R3,R2 +  S3,S3,S3,S2 = t,t,P3,P2
+      movaps xmm11,xmm9     ;
+      shufps xmm11,xmm11,254 ;    1111 1110b -> S3,S3,S3,S2
+      addps xmm9,xmm11     ;    S3,S2,R3,R2 +  S3,S3,S3,S2 = t,t,P3,P2
 
 	 ;lauflaenge in t zu index
-		;mulps xmm2,xmm8      ;    t,t,P1,P0*factor,factor,factor,factor = t,t,index1,index0
+	 mulps xmm2,xmm8      ;    t,t,P1,P0*factor,factor,factor,factor = t,t,index1,index0
 	 
       ;PIPE2 lauflaenge in t zu index
-		;mulps xmm9,xmm8      ;    t,t,P1,P0*factor,factor,factor,factor = t,t,index1,index0
-	vmulps ymm2,ymm2,ymm8
+      mulps xmm9,xmm8      ;    t,t,P1,P0*factor,factor,factor,factor = t,t,index1,index0
+
 	 ;time to index for P0
 	 cvtss2si eax,xmm2    ;    index_value0
-   
- 	 mov r15,rdi
-	 lea rdi,[r13+rbp]
-	 vmovupd ymm14,[r12+rbp] ;read all 4 pixel!
-	; movupd xmm13,[r12+rbp+16] ;read all 2 pixel! 
-   
+
 	;;;;;;;;;;;;;;;;;;;;;;;;
 	;rangecheck pixel 1
-	 cmp eax,dword [rel WIDTH_BUFFER]	 ;n_Ascan *5      ;cmp eax,dword [rsp+120] ;n_Ascan
+	 cmp eax,dword [rsp+128]	 ;n_Ascan *5      ;cmp eax,dword [rsp+120] ;n_Ascan
 	 jge outrange_xsum1	 ;0....2999
 	 cmp eax,0		 ;
 	 jl outrange_xsum1
 
-	 ;;inrange real
-	 ;fld qword [r12+rbp] ; *image_sum_real fpu move
+	 ;inrange real
+	 fld qword [r12+rbp] ; *image_sum_real fpu move
 	 shl eax,3		;imul eax,8    ;index-> 64bit (double) addr   NP
-	 ;fld qword [r11+rax]	;*buffer_real[index_aktual]         fpu double move
-	 ;faddp st1,st0
-	 
-	 ;;write PIXEL0!
-	 ;fstp qword [r13+rbp]	; write pixel to *bild_real[index_aktual]
-	 
-	 ;in range pixel0
-	 ;movss xmm14,[r12+rbp]
-	 addsd xmm14,[r11+rax]
-	
+	 fld qword [r11+rax]	;*buffer_real[index_aktual]         fpu double move
+	 faddp st1,st0
+
+   ;write PIXEL0!
+	 fstp qword [r13+rbp]	; write pixel to *bild_real[index_aktual]
+
 	   ;complex Ascan ?
 	   cmp rsi,0		 ;dword [rsp+88],0  ;*AScan_complex
 	   jz rangecheck_pixel_2
@@ -979,25 +1013,19 @@ _as2v_complex:
 	 shufps xmm2,xmm2,85	; 0101 0101b -> P1,P1,P1,P1
 	 cvtss2si eax,xmm2	; index_value
 
-	 cmp eax,dword [rel WIDTH_BUFFER]	;n_Ascan *5   ;cmp eax,[rsp+120]    ;n_Ascan
+	 cmp eax,dword [rsp+128]	;n_Ascan *5   ;cmp eax,[rsp+120]    ;n_Ascan
 	 jge outrange_xsum2	;0....2999
 	 cmp eax,0		;
 	 jl outrange_xsum2
 
-	 ;;inrange real
+	 ;inrange real
 	 shl eax,3		;imul eax,8    ;index-> 64bit (double) addr   NP
-	 ;fld qword [r12+rbp+8]	;*image_sum_real+ delta Image +1pixel
-	 ;fld qword [r11+rax]	;*buffer_real[index_aktual]  fpu double move
-	 ;faddp st1,st0
-	 
-   ;;write pixel1!
-	 ;fstp qword [r13+rbp+8] ; write pixel to *bild_real[index_aktual]
-   
-   ;in range pixel0
-	 ;movss xmm14,[r12+rbp]
-	 shufpd xmm14,xmm14,1 ; 10   -> rotate
-	 addsd xmm14,[r11+rax]
-	 shufpd xmm14,xmm14,1 ; 10 -> rotate
+	 fld qword [r12+rbp+8]	;*image_sum_real+ delta Image +1pixel
+	 fld qword [r11+rax]	;*buffer_real[index_aktual]  fpu double move
+	 faddp st1,st0
+
+	 ;write pixel1!
+	 fstp qword [r13+rbp+8] ; write pixel to *bild_real[index_aktual]
 
 	   ;complex Ascan ?
 	   cmp rsi,0		 ;dword [rsp+88],0  ;*AScan_complex
@@ -1037,28 +1065,23 @@ _as2v_complex:
 	
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	rangecheck_pixel_3:
-   vperm2f128 ymm2, ymm2, ymm2, 1
-   vinsertf128 ymm14, ymm14, xmm14, 1
+   
    xor rax,rax          ; clear upper part of RAX for later EAX -> RAX (for delta on memory access)
-	 cvtss2si eax,xmm2	; index_value
+	 cvtss2si eax,xmm9	; index_value
 
-	 cmp eax,dword [rel WIDTH_BUFFER]	;n_Ascan *5   ;cmp eax,[rsp+120]    ;n_Ascan
+	 cmp eax,dword [rsp+128]	;n_Ascan *5   ;cmp eax,[rsp+120]    ;n_Ascan
 	 jge outrange_xsum3	;0....2999
 	 cmp eax,0		;
 	 jl outrange_xsum3
 
 	 ;inrange real
 	 shl eax,3		;imul eax,8    ;index-> 64bit (double) addr   NP
-	 ;fld qword [r12+rbp+16]	;*image_sum_real+ delta Image +2pixel
-	 ;fld qword [r11+rax]	;*buffer_real[index_aktual]  fpu double move
-	 ;faddp st1,st0
+	 fld qword [r12+rbp+16]	;*image_sum_real+ delta Image +2pixel
+	 fld qword [r11+rax]	;*buffer_real[index_aktual]  fpu double move
+	 faddp st1,st0
 
 	 ;write pixel2!
-	 ;fstp qword [r13+rbp+16] ; write pixel to *bild_real[index_aktual]
-
-   ;in range pixel2
-	 ;movss xmm14,[r12+rbp]
-	 addsd xmm14,[r11+rax]
+	 fstp qword [r13+rbp+16] ; write pixel to *bild_real[index_aktual]
 
 	   ;complex Ascan ?
 	   cmp rsi,0		 ;dword [rsp+88],0  ;*AScan_complex
@@ -1100,29 +1123,23 @@ _as2v_complex:
 	rangecheck_pixel_4:
    
    xor rax,rax          ; clear upper part of RAX for later EAX -> RAX (for delta on memory access)
-	 shufps xmm2,xmm2,85	; 0101 0101b -> P1,P1,P1,P1
-	 cvtss2si eax,xmm2	; index_value
+	 shufps xmm9,xmm9,85	; 0101 0101b -> P1,P1,P1,P1
+	 cvtss2si eax,xmm9	; index_value
 
-	 cmp eax,dword [rel WIDTH_BUFFER]	;n_Ascan *5   ;cmp eax,[rsp+120]    ;n_Ascan
+	 cmp eax,dword [rsp+128]	;n_Ascan *5   ;cmp eax,[rsp+120]    ;n_Ascan
 	 jge outrange_xsum4	;0....2999
 	 cmp eax,0		;
 	 jl outrange_xsum4
 
 	 ;inrange real
 	 shl eax,3		;imul eax,8    ;index-> 64bit (double) addr   NP
-	 ;fld qword [r12+rbp+24]	;*image_sum_real+ delta Image +3pixel
-	 ;fld qword [r11+rax]	;*buffer_real[index_aktual]  fpu double move
-	 ;faddp st1,st0
+	 fld qword [r12+rbp+24]	;*image_sum_real+ delta Image +3pixel
+	 fld qword [r11+rax]	;*buffer_real[index_aktual]  fpu double move
+	 faddp st1,st0
 
-	 ;;write pixel3!
-	 ;fstp qword [r13+rbp+24] ; write pixel to *bild_real[index_aktual]
+	 ;write pixel3!
+	 fstp qword [r13+rbp+24] ; write pixel to *bild_real[index_aktual]
 
-   ;in range pixel3
-	 ;movss xmm14,[r12+rbp]
-	 shufpd xmm14,xmm14,1 ; 01 -> rotate
-	 addsd xmm14,[r11+rax]
-	 shufpd xmm14,xmm14,1 ; 01 -> rotate
-	 
 	   ;complex Ascan ?
 	   cmp rsi,0		 ;dword [rsp+88],0  ;*AScan_complex
 	   jz out_pixel4
@@ -1157,15 +1174,6 @@ _as2v_complex:
 
 	;;;;;;;;;;;
 	out_pixel4:
-		
-	;real write (NON-temporal)!	
-	vmovupd [rdi],ymm14
-	;maskmovdqu xmm14,xmm15
-	;lea rdi,[rdi+16]
-		;movupd [rdi+16],xmm13
-	;maskmovdqu xmm13,xmm15
-	
-	mov rdi,r15	
 		
 
 	;add x_p + 4pixel
@@ -1218,24 +1226,18 @@ check_ifloop:
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;
     exit:
-      ;;;;clean up FPU/MMX
+  ;;;;clean up FPU/MMX
 	;emms             ;reset mmx, ready fpu
 	;FLDCW [esp+4]    ;restore old CTRWORD            ;buffering in stack (16bit!) + FWAIT to ensure save is complete (FSTCW without wait)
 
 
-      ;;;;;;for debug output
-	;mov eax,[rel WIDTH_BUFFER] ;out width (previous test)
-
-
 	;recover XMM6-7 (callee convention WIN64(?))
-	movups xmm7,[rel XMM7_SAVE]
-	movups xmm6,[rel XMM6_SAVE]
+	;movups xmm7,[rel XMM7_SAVE]
+	;movups xmm6,[rel XMM6_SAVE]
 
 	;;;;;clean up
-	mov rsp, [rel RSP_SAVE]
-
-	;pop eax
-	;pop eax
+	;mov rsp, [rel RSP_SAVE]
+  mov rsp,[rsp+136]
 
 	pop rbx
 	pop rdi
@@ -1248,6 +1250,512 @@ check_ifloop:
 
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;,
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;BILD SOUNDMAP version instead of fixed soundspeed
+
+as2v_complex_sm:	
+_as2v_complex_sm:
+
+	
+	push rbp
+	push rsi
+	push rdi
+	push rbx	 ;+12 (diff:esp+8)
+
+	;;;save rsp
+	;mov [rel RSP_SAVE],qword rsp
+	mov rsi, rsp
+	
+	;;;save XMM6-7 (callee convention WIN64(?))
+	;movups [rel XMM6_SAVE],xmm6
+	;movups [rel XMM7_SAVE],xmm7
+
+	;transfer via rcx because first parameter on MS-64 convention and 4. on linux,so pass the pointer as 1. & 4. 
+	mov rsp,rcx
+
+  ;;Save rsp
+  mov [rsp+136], rsi
+
+
+ 	fninit		 ;init fpu
+
+
+    ;init mm7 with zero
+    ;mov eax,0           ;
+    ;cvtsi2ss xmm7,eax   ; xmm7 = 0
+    ;shufps   xmm7,xmm7,0; 0,0,0,0
+    ;CVTPS2PI mm7,xmm7   ; mm7  = 0
+
+    ;pixel_pos
+    mov rdx,[rsp+32]	 ;*pixelpos
+    movss  xmm7,[rdx+8]  ;pixelpos      0,0,0,Z
+    shufps xmm7,xmm7,0	 ;pixelpos      Z,Z,Z,Z
+    movlps xmm7,[rdx]	 ;pixelpos      Z(TRASH),Z,Y,X
+
+    ;rec_pos
+    mov rdx,[rsp+48]	 ;*receiverpos
+    movss  xmm6,[rdx+8]  ;receiverpos   0,0,0,Z
+    shufps xmm6,xmm6,0	 ;receiverpos   Z,Z,Z,Z
+    movlps xmm6,[rdx]	 ;receiverpos   Z(TRASH),Z,Y,X
+
+    ;sender_pos
+    mov rdx,[rsp+56]	 ;*senderpos
+    movss  xmm5,[rdx+8]  ;senderpos     0,0,0,Z
+    shufps xmm5,xmm5,0	 ;senderpos     Z,Z,Z,Z
+    movlps xmm5,[rdx]	 ;senderpos     Z(TRASH),Z,Y,X
+
+    ;resolut
+    mov rdx,[rsp+72]	 ;*resolut
+    movss xmm4,[rdx]	 ;t,t,t,resolut
+
+    ;factor = 1/(timeinterval)
+    mov eax,5		 ; 1 for interp_ratio 1 -> 5 for actual !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    cvtsi2ss xmm3,eax	 ;xmm3=1
+    ; LATER DYNAMICALLY mov rdx,[rsp+64]	 ;*speed NOW SPEEDMAP!
+    ;                   movss xmm2,[rdx]
+    mov rdx,[rsp+80]	 ;*timeinterval
+    movss xmm1,[rdx]
+    ;                   mulss xmm2,xmm1
+    divss xmm3,xmm1	 ;xmm3 = 1/(timeinterval)
+    unpcklps xmm4,xmm3	 ; t,t,factor,resolut
+
+    ;interleave in xmm4
+    mov eax,-1		 ;4294967295
+    cvtsi2ss xmm3,eax	 ;xmm3 = 1
+
+    ;fixed interpol factor
+    mov eax,5
+    cvtsi2ss xmm1,eax	 ;xmm1 = 5
+
+    mov eax,[rsp+120]	 ;n_Ascan
+    cvtsi2ss xmm2,eax	 ;xmm2 = 3000
+
+    mulss xmm2,xmm1	 ;3000*5 ->15000
+    cvtss2si eax,xmm2;
+    mov dword [rsp+128],eax ;15000
+    unpcklps xmm3,xmm2	 ;xmm3 = t,t,15000,-1
+    shufps xmm4,xmm3,68  ;0100 0100b -> xmm4 = 15000,-1,factor,resolut
+    
+    ;;;create complete factor buffer
+    movaps xmm8,xmm4
+	  shufps xmm8,xmm8,85  ;    0101 0101b -> factor,factor,factor,factor
+    
+    ;;; create 2*resolut buffer
+    movss  xmm10,xmm4    ;    t,t,t,resolut
+    shufps xmm10,xmm10,0 ;    0000 0000b -> resolut,resolut,reolut,resolut 
+    addps xmm10,xmm10    ;    2*resolut,2*resolut,2*resolut,2*resolut  
+    
+    ;;fill up counters
+    mov edi,[rsp+116]	 ; n_pixZ
+    mov edx,[rsp+112]	 ; n_pixY
+    mov ecx,[rsp+124]	 ; n_pixX
+   
+    ;;;fillup pointer to data
+    mov rsi,[rsp+88]	 ; *ascan_complex (if not existent = NULL = 0)
+ 
+    mov r10,[rsp+32]   ;*pixelpos
+    mov r11,[rsp+24]	;*buffer_real[index_aktual]               NP
+	  mov r12,[rsp+96]	;*image_sum_real
+    mov r13,[rsp+0]	  ;*bild_real
+     
+    
+    ;;delta Counter
+    mov rbp,0		 ; delta IMAGE
+
+   Z_loop_sm:
+
+     Y_loop_init_sm:
+     mov edx,[rsp+112]	  ; n_pixY
+     movlps xmm7,[r10]	  ;pixelpos     (t),Z(akt),Y(0),X(0_but_is_notimportant)
+
+     Y_loop_sm:
+       ;pix z,y
+       movaps xmm3,xmm7     ;          (trash),z_p,y_p,x_p
+       shufps xmm3,xmm3,165 ; 10100101b -> z_p,z_p,y_p,y_p
+       ;receiver z,y
+       movaps xmm2,xmm6     ;     (trash),z_r,y_r,x_r
+       shufps xmm2,xmm2,153 ; 10011001b -> (t),(t),z_r,y_r       psrldq xmm2,4        ;      SSE2 shift right by BYTES not BITS! t,t,z,y
+       ;sender  z,y
+       movaps xmm1,xmm5     ;     (trash),z_s,y_s,x_s
+       shufps xmm1,xmm1,153 ; 10011001b -> (t),(t),z_s,y_s       psrldq xmm1,4        ;      SSE2 shift right by BYTES not BITS! t,t,z,y
+       ;interleave
+       unpcklps xmm2,xmm1   ;     z_s,z_r,y_s,y_r
+    
+       subps xmm3,xmm2	    ;     pix-senderpos pix-receiverpos
+       mulps xmm3,xmm3	    ;     quadrieren
+
+       movaps xmm2,xmm3     ;     z_s,z_r,y_s,y_r
+       shufps xmm2,xmm2,238 ;11101110b-> t,t,z_s,z_r            psrldq xmm2,8        ;SSE2 shift right by BYTES not BITS! t,t,z_s,z_r
+       addps  xmm3,xmm2     ;     (t,t,z_s,z_r) + (t,t,y_s,y_r)  -> t,t,S,R
+       unpcklps xmm3,xmm3   ;     S,S,R,R  ;!!!!shufps xmm3,xmm3,68  ;     0100 0100b -> S,R,S,R    ;
+
+       X_loop_init_sm:
+   mov ecx,[rsp+124]     ;    n_pixX
+   movss xmm2,[r10]     ;    *pixelpos[3]
+	 movss xmm7,xmm2      ;    t,Z(akt),Y(akt),X(0)
+
+       X_loop_sm:		     ;     !!!2 PIXEL in parallel!!!
+	 ;x_p1 & x_p0
+	 movss	xmm2,xmm7     ;    pixel  t,t,t,x_p
+	 shufps xmm2,xmm2,0   ;    x_p,x_p,x_p,x_p
+	 addss	xmm2,xmm4     ;    x_p,x_p,x_p,x_p + t,t,t,resolut -> x_p0,x_p0,x_p0,x_p1
+	 shufps xmm2,xmm2,17  ;    0001 0001b ->  x_p1,x_p0,x_p1,x_p0
+	 
+      ;;;PIPE2
+      movaps xmm9,xmm2
+      addps  xmm9,xmm10    ;    x_p1,x_p0,x_p1,x_p0+ 2*resolut ->  x_p3,x_p2,x_p3,x_p2 
+
+	 ;x_r &  x_s
+	 movss xmm1,xmm6      ;    receiver (trash),z_r,y_r,x_r
+	 shufps xmm1,xmm5,0   ;    sender; 0000 0000b -> S,S,R,R
+
+	 subps xmm2,xmm1      ;    x_p-x_r, x_p-x_s -> S1,S0,R1,R0
+      ;PIPE2
+      subps xmm9,xmm1      ;    x_p-x_r, x_p-x_s -> S3,S2,R3,R2
+	 mulps xmm2,xmm2      ;    quadrieren
+      ;PIPE2
+      mulps xmm9,xmm9      ;    quadrieren
+	 
+	 addps xmm2,xmm3      ;    S1x,S0x,R1x,R0x + Syz,Syz,Ryz,Ryz
+      ;PIPE2
+      addps xmm9,xmm3      ;    S1x,S0x,R1x,R0x + Syz,Syz,Ryz,Ryz
+	 sqrtps xmm2,xmm2     ;    sqrt
+   ;rsqrtps xmm2,xmm2     ;    reziprok. sqrt approx.
+   ;rcpps xmm2,xmm2     ;   
+
+      ;PIPE2
+      sqrtps xmm9,xmm9     ;    sqrt
+      ;rsqrtps xmm9,xmm9     ;    reziprok. sqrt approx.
+      ;rcpps xmm9,xmm9     ;   
+
+
+	 movaps xmm1,xmm2     ;
+	 shufps xmm1,xmm1,254 ;    1111 1110b -> S1,S1,S1,S0
+	 addps xmm2,xmm1     ;    S1,S0,R1,R0 +  S1,S1,S1,S0 = t,t,P1,P0
+	 
+       ;PIPE2
+      movaps xmm11,xmm9     ;
+      shufps xmm11,xmm11,254 ;    1111 1110b -> S3,S3,S3,S2
+      addps xmm9,xmm11     ;    S3,S2,R3,R2 +  S3,S3,S3,S2 = t,t,P3,P2
+
+	 ;lauflaenge in t zu index
+	 mulps xmm2,xmm8      ;    t,t,P1,P0*factor,factor,factor,factor = t,t,index1,index0
+	 
+      ;PIPE2 lauflaenge in t zu index
+      mulps xmm9,xmm8      ;    t,t,P1,P0*factor,factor,factor,factor = t,t,index1,index0
+
+
+   ;SOUNDMAP COMPUTATIONS
+	 shr rbp,1	      ;    TO SINGLE DELTA ADDRESS
+	 mov rax,[rsp+64]	;    *sound_map
+	 movups xmm1,[rax+rbp];   P3_sm,P2_sm,P1_sm,P0_sm (4 SINGLE VALUES)
+	 RCPPS xmm1,xmm1  ;   1/P3_sm,1/P2_sm,1/P1_sm,1/P0_sm (4 SINGLE VALUES)
+	 shl rbp,1	      ;    AGAIN back TO DOUBLE DELTA ADDRESS
+	 
+	 ;Pipe1
+	 mulps xmm2,xmm1      ;    t*factor*1/speed=index
+      ;Pipe2
+      shufps xmm1,xmm1,238 ; 1/P3_sm,1/P2_sm,1/P1_sm,1/P0_sm -> 1/P3_sm,1/P2_sm,1/P3_sm,1/P2_sm
+      mulps xmm9,xmm1      ;    t*factor*1/speed=index
+
+	 ;time to index for P0
+	 cvtss2si eax,xmm2    ;    index_value0
+
+	;;;;;;;;;;;;;;;;;;;;;;;;
+	;rangecheck pixel 1
+	 cmp eax,dword [rsp+128]	 ;n_Ascan *5      ;cmp eax,dword [rsp+120] ;n_Ascan
+	 jge outrange_xsum1_sm	 ;0....2999
+	 cmp eax,0		 ;
+	 jl outrange_xsum1_sm
+
+	 ;inrange real
+	 fld qword [r12+rbp] ; *image_sum_real fpu move
+	 shl eax,3		;imul eax,8    ;index-> 64bit (double) addr   NP
+	 fld qword [r11+rax]	;*buffer_real[index_aktual]         fpu double move
+	 faddp st1,st0
+
+   ;write PIXEL0!
+	 fstp qword [r13+rbp]	; write pixel to *bild_real[index_aktual]
+
+	   ;complex Ascan ?
+	   cmp rsi,0		 ;dword [rsp+88],0  ;*AScan_complex
+	   jz rangecheck_pixel_2_sm
+
+	   mov rbx,[rsp+40]	 ;*buffer_complex[index_aktual]
+	   fld qword [rbx+rax]	 ;fpu move
+
+	   mov rbx,[rsp+104]	 ;*image_sum_compl
+	   fld qword [rbx+rbp]
+	   faddp st1,st0
+
+	   mov rbx,[rsp+16]	 ;*bild_compl[index_aktual]
+	   fstp qword [rbx+rbp]  ; rbp = *bild_compl[index_aktual]
+	   jmp rangecheck_pixel_2_sm
+
+	outrange_xsum1_sm:
+	 ;real
+	 fld qword [r12+rbp]  ;*image_sum_real FPU MOVE
+	 
+	 ;;write pixel0
+	 fstp qword [r13+rbp]	 ; write pixel0 to *bild_real[index_aktual]
+
+	   ;Complex AScan ?
+	   cmp rsi,0		 ;dword [rsp+88],0  ;*AScan_complex
+	   jz rangecheck_pixel_2_sm ;jump out if only real
+
+	   mov rbx,[rsp+104]	 ;*image_sum_compl
+	   fld qword [rbx+rbp]
+
+	   mov rbx,[rsp+16]	 ;*bild_compl[index_aktual]
+	   fstp qword [rbx+rbp]  ; rbp = *bild_compl[index_aktual]
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	rangecheck_pixel_2_sm:
+   
+   xor rax,rax          ; clear upper part of RAX for later EAX -> RAX (for delta on memory access)
+	 shufps xmm2,xmm2,85	; 0101 0101b -> P1,P1,P1,P1
+	 cvtss2si eax,xmm2	; index_value
+
+	 cmp eax,dword [rsp+128]	;n_Ascan *5   ;cmp eax,[rsp+120]    ;n_Ascan
+	 jge outrange_xsum2_sm	;0....2999
+	 cmp eax,0		;
+	 jl outrange_xsum2_sm
+
+	 ;inrange real
+	 shl eax,3		;imul eax,8    ;index-> 64bit (double) addr   NP
+	 fld qword [r12+rbp+8]	;*image_sum_real+ delta Image +1pixel
+	 fld qword [r11+rax]	;*buffer_real[index_aktual]  fpu double move
+	 faddp st1,st0
+
+	 ;write pixel1!
+	 fstp qword [r13+rbp+8] ; write pixel to *bild_real[index_aktual]
+
+	   ;complex Ascan ?
+	   cmp rsi,0		 ;dword [rsp+88],0  ;*AScan_complex
+	   jz out_pixel2_sm
+
+	   mov rbx,[rsp+40]	 ;*buffer_complex[index_aktual]
+	   fld qword [rbx+rax]	 ;fpu move
+
+	   mov rbx,[rsp+104]	  ;*image_sum_compl
+	   fld qword [rbx+rbp+8]  ; delta Image +1pixel
+	   faddp st1,st0
+
+	   mov rbx,[rsp+16]	  ;*bild_compl[index_aktual]
+	   fstp qword [rbx+rbp+8] ; rbp = *bild_compl[index_aktual]
+	   jmp out_pixel2_sm
+
+	outrange_xsum2_sm:
+	 ;real
+	 fld qword [r12+rbp+8] ;*image_sum_real + deltabild+ 1pixel
+	 
+	 ;write pixel1!
+	 fstp qword [r13+rbp+8] ; write pixel to *bild_real[index_aktual]
+
+	   ;Complex AScan ?
+	   cmp rsi,0		 ;dword [rsp+88],0  ;*AScan_complex
+	   jz out_pixel2_sm	 ;jump out if only real
+
+	   mov rbx,[rsp+104]	  ;*image_sum_compl
+	   fld qword [rbx+rbp+8]
+
+	   mov rbx,[rsp+16]	 ;*bild_compl[index_aktual]
+	   fstp qword [rbx+rbp+8]  ; rbp = *bild_compl[index_aktual]
+
+	;;;;;;;;;;;
+	out_pixel2_sm:
+	
+	
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	rangecheck_pixel_3_sm:
+   
+   xor rax,rax          ; clear upper part of RAX for later EAX -> RAX (for delta on memory access)
+	 cvtss2si eax,xmm9	; index_value
+
+	 cmp eax,dword [rsp+128]	;n_Ascan *5   ;cmp eax,[rsp+120]    ;n_Ascan
+	 jge outrange_xsum3_sm	;0....2999
+	 cmp eax,0		;
+	 jl outrange_xsum3_sm
+
+	 ;inrange real
+	 shl eax,3		;imul eax,8    ;index-> 64bit (double) addr   NP
+	 fld qword [r12+rbp+16]	;*image_sum_real+ delta Image +2pixel
+	 fld qword [r11+rax]	;*buffer_real[index_aktual]  fpu double move
+	 faddp st1,st0
+
+	 ;write pixel2!
+	 fstp qword [r13+rbp+16] ; write pixel to *bild_real[index_aktual]
+
+	   ;complex Ascan ?
+	   cmp rsi,0		 ;dword [rsp+88],0  ;*AScan_complex
+	   jz out_pixel3_sm
+
+	   mov rbx,[rsp+40]	 ;*buffer_complex[index_aktual]
+	   fld qword [rbx+rax]	 ;fpu move
+
+	   mov rbx,[rsp+104]	  ;*image_sum_compl
+	   fld qword [rbx+rbp+16]  ; delta Image +2pixel
+	   faddp st1,st0
+
+	   mov rbx,[rsp+16]	  ;*bild_compl[index_aktual]
+	   fstp qword [rbx+rbp+16] ; rbp = *bild_compl[index_aktual]
+	   jmp out_pixel3_sm
+
+	outrange_xsum3_sm:
+	 ;real
+	 fld qword [r12+rbp+16] ;*image_sum_real + deltabild+ 2pixel
+	 
+	 ;write pixel1!
+	 fstp qword [r13+rbp+16] ; write pixel to *bild_real[index_aktual]
+
+	   ;Complex AScan ?
+	   cmp rsi,0		 ;dword [rsp+88],0  ;*AScan_complex
+	   jz out_pixel3_sm	 ;jump out if only real
+
+	   mov rbx,[rsp+104]	  ;*image_sum_compl
+	   fld qword [rbx+rbp+16]
+
+	   mov rbx,[rsp+16]	 ;*bild_compl[index_aktual]
+	   fstp qword [rbx+rbp+16]  ; rbp = *bild_compl[index_aktual]
+
+	;;;;;;;;;;;
+	out_pixel3_sm:
+	
+	
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	rangecheck_pixel_4_sm:
+   
+   xor rax,rax          ; clear upper part of RAX for later EAX -> RAX (for delta on memory access)
+	 shufps xmm9,xmm9,85	; 0101 0101b -> P1,P1,P1,P1
+	 cvtss2si eax,xmm9	; index_value
+
+	 cmp eax,dword [rsp+128]	;n_Ascan *5   ;cmp eax,[rsp+120]    ;n_Ascan
+	 jge outrange_xsum4_sm	;0....2999
+	 cmp eax,0		;
+	 jl outrange_xsum4_sm
+
+	 ;inrange real
+	 shl eax,3		;imul eax,8    ;index-> 64bit (double) addr   NP
+	 fld qword [r12+rbp+24]	;*image_sum_real+ delta Image +3pixel
+	 fld qword [r11+rax]	;*buffer_real[index_aktual]  fpu double move
+	 faddp st1,st0
+
+	 ;write pixel3!
+	 fstp qword [r13+rbp+24] ; write pixel to *bild_real[index_aktual]
+
+	   ;complex Ascan ?
+	   cmp rsi,0		 ;dword [rsp+88],0  ;*AScan_complex
+	   jz out_pixel4_sm
+
+	   mov rbx,[rsp+40]	 ;*buffer_complex[index_aktual]
+	   fld qword [rbx+rax]	 ;fpu move
+
+	   mov rbx,[rsp+104]	  ;*image_sum_compl
+	   fld qword [rbx+rbp+24]  ; delta Image +3pixel
+	   faddp st1,st0
+
+	   mov rbx,[rsp+16]	  ;*bild_compl[index_aktual]
+	   fstp qword [rbx+rbp+24] ; rbp = *bild_compl[index_aktual]
+	   jmp out_pixel4_sm
+
+	outrange_xsum4_sm:
+	 ;real
+	 fld qword [r12+rbp+24] ;*image_sum_real + deltabild+ 1pixel
+	 
+	 ;write pixel1!
+	 fstp qword [r13+rbp+24] ; write pixel to *bild_real[index_aktual]
+
+	   ;Complex AScan ?
+	   cmp rsi,0		 ;dword [rsp+88],0  ;*AScan_complex
+	   jz out_pixel4_sm	 ;jump out if only real
+
+	   mov rbx,[rsp+104]	  ;*image_sum_compl
+	   fld qword [rbx+rbp+24]
+
+	   mov rbx,[rsp+16]	 ;*bild_compl[index_aktual]
+	   fstp qword [rbx+rbp+24]  ; rbp = *bild_compl[index_aktual]
+
+	;;;;;;;;;;;
+	out_pixel4_sm:
+		
+
+	;add x_p + 4pixel
+	addss xmm7,xmm10  ; t,t,t,x_p  + t,t,t,2*resolut
+	addss xmm7,xmm10  ; t,t,t,x_p  + t,t,t,2*resolut
+
+	;inc image index (4pixel)
+	add rbp,32	 ;*bild_real[index_aktual] +4pixel[double]
+	sub  ecx,4
+	
+check_ifloop_sm:
+	cmp  ecx,4
+	jge X_loop_sm
+
+	;mod(ecx,4) ==0???
+	cmp  ecx,0
+	je exit_X_loop_sm  ;finished!!!
+	  ;add x size until mod(ecx,4) == 0 -> ecx =4
+	  add ecx,1
+	  subss xmm7,xmm4      ; t,t,t,x_p  - t,t,t,resolut
+	  sub rbp,8	       ;*bild_real[index_aktual] -1pixel[double]
+	  jmp check_ifloop_sm
+
+	exit_X_loop_sm:
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+      ;add y_p + 1pixel
+      xorps xmm0,xmm0	   ; xmm0 = 0
+      movss xmm0,xmm4	   ; t,t,t,resolut
+      shufps xmm0,xmm0,81  ; 01010001b -> 0,0,resolut,0
+      addps xmm7,xmm0	   ; t,t,y_p,t  + 0,0,resolut,0
+
+      sub  edx,1
+      jnz Y_loop_sm
+      ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+    ;add z_p + 1pixel
+    xorps xmm0,xmm0	   ; xmm0 = 0
+    movss xmm0,xmm4	   ; t,t,t,resolut
+    shufps xmm0,xmm0,69    ; 01000101b -> 0,resolut,0,0
+    addps xmm7,xmm0	   ; t,z_p,t,t  + 0,resolut,0,0
+
+    sub edi,1
+    jnz Z_loop_sm
+    jmp exit_sm
+    ;;;;end sum_branch;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+ 
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;
+    exit_sm:
+  ;;;;clean up FPU/MMX
+	;emms             ;reset mmx, ready fpu
+	;FLDCW [esp+4]    ;restore old CTRWORD            ;buffering in stack (16bit!) + FWAIT to ensure save is complete (FSTCW without wait)
+
+
+	;recover XMM6-7 (callee convention WIN64(?))
+	;movups xmm7,[rel XMM7_SAVE]
+	;movups xmm6,[rel XMM6_SAVE]
+
+	;;;;;clean up
+	;mov rsp, [rel RSP_SAVE]
+  mov rsp,[rsp+136]
+
+	pop rbx
+	pop rdi
+	pop rsi
+	pop rbp
+
+    
+	ret
+	;retn ; bug return near!!!
+
+
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; END SOUNDMAP version
+
 
 	;FNINIT und FLDCW
 	;MOVD MM0,eax ; edx nach MM0
