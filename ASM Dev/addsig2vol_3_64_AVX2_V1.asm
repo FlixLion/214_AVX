@@ -850,6 +850,7 @@ _as2v_complex:
     ;;;create complete factor buffer
     movaps xmm8,xmm4
 	  shufps xmm8,xmm8,85  ;    0101 0101b -> factor,factor,factor,factor
+	vinsertf128 ymm8,ymm8,xmm8,1 ; -> factor,factor,factor,factor
     
     ;;; create 2*resolut buffer
     movss  xmm10,xmm4    ;    t,t,t,resolut
@@ -899,6 +900,7 @@ _as2v_complex:
        shufps xmm2,xmm2,238 ;11101110b-> t,t,z_s,z_r            psrldq xmm2,8        ;SSE2 shift right by BYTES not BITS! t,t,z_s,z_r
        addps  xmm3,xmm2     ;     (t,t,z_s,z_r) + (t,t,y_s,y_r)  -> t,t,S,R
        unpcklps xmm3,xmm3   ;     S,S,R,R  ;!!!!shufps xmm3,xmm3,68  ;     0100 0100b -> S,R,S,R    ;
+vinsertf128 ymm3,ymm3,xmm3,1
 
        X_loop_init:
    mov ecx,[rsp+124]     ;    n_pixX
@@ -916,44 +918,55 @@ _as2v_complex:
       movaps xmm9,xmm2
       addps  xmm9,xmm10    ;    x_p1,x_p0,x_p1,x_p0+ 2*resolut ->  x_p3,x_p2,x_p3,x_p2 
 
+vinsertf128 ymm2,ymm2,xmm9,1 ; x_p0,x_p0,x_p0,x_p1,x_p3,x_p2,x_p3,x_p2 
 	 ;x_r &  x_s
 	 movss xmm1,xmm6      ;    receiver (trash),z_r,y_r,x_r
 	 shufps xmm1,xmm5,0   ;    sender; 0000 0000b -> S,S,R,R
 
-	 subps xmm2,xmm1      ;    x_p-x_r, x_p-x_s -> S1,S0,R1,R0
+	 vinsertf128 ymm1,ymm1,xmm1, 1 ; -> S,S,R,R,S,S,R,R
+
+	 ;subps xmm2,xmm1      ;    x_p-x_r, x_p-x_s -> S1,S0,R1,R0
       ;PIPE2
-      subps xmm9,xmm1      ;    x_p-x_r, x_p-x_s -> S3,S2,R3,R2
-	 mulps xmm2,xmm2      ;    quadrieren
+      ;subps xmm9,xmm1      ;    x_p-x_r, x_p-x_s -> S3,S2,R3,R2
+vsubps ymm2,ymm2,ymm1 	;	x_p-x_r, x_p-x_s -> S1,S0,R1,R0,S3,S2,R3,R2
+	 ;mulps xmm2,xmm2      ;    quadrieren
       ;PIPE2
-      mulps xmm9,xmm9      ;    quadrieren
+      ;mulps xmm9,xmm9      ;    quadrieren
+ vmulps ymm2,ymm2,ymm2 	;	quadrieren
 	 
-	 addps xmm2,xmm3      ;    S1x,S0x,R1x,R0x + Syz,Syz,Ryz,Ryz
+	 ;addps xmm2,xmm3      ;    S1x,S0x,R1x,R0x + Syz,Syz,Ryz,Ryz
       ;PIPE2
-      addps xmm9,xmm3      ;    S1x,S0x,R1x,R0x + Syz,Syz,Ryz,Ryz
-	 sqrtps xmm2,xmm2     ;    sqrt
+     ; addps xmm9,xmm3      ;    S1x,S0x,R1x,R0x + Syz,Syz,Ryz,Ryz
+vaddps ymm2,ymm2,ymm3	;	S1x,S0x,R1x,R0x,S3x,S2x,R3x,R2x + Syz,Syz,Ryz,Ryz,Syz,Syz,Ryz,Ryz
+	 ;sqrtps xmm2,xmm2     ;    sqrt
    ;rsqrtps xmm2,xmm2     ;    reziprok. sqrt approx.
    ;rcpps xmm2,xmm2     ;   
 
       ;PIPE2
-      sqrtps xmm9,xmm9     ;    sqrt
+     ; sqrtps xmm9,xmm9     ;    sqrt
+vsqrtps ymm2,ymm2	;	sqrt
       ;rsqrtps xmm9,xmm9     ;    reziprok. sqrt approx.
       ;rcpps xmm9,xmm9     ;   
 
 
-	 movaps xmm1,xmm2     ;
-	 shufps xmm1,xmm1,254 ;    1111 1110b -> S1,S1,S1,S0
-	 addps xmm2,xmm1     ;    S1,S0,R1,R0 +  S1,S1,S1,S0 = t,t,P1,P0
+	 ;movaps xmm1,xmm2     ;
+	 vmovaps ymm1,ymm2
+	; shufps xmm1,xmm1,254 ;    1111 1110b -> S1,S1,S1,S0
+vshufps ymm1,ymm1,254	;	1111 1110b -> S1,S1,S1,S0,S3,S3,S3,S2
+	; addps xmm2,xmm1     ;    S1,S0,R1,R0 +  S1,S1,S1,S0 = t,t,P1,P0
+vaddps ymm2,ymm2,ymm1 ; 	t,t,P1,P0,t,t,P3,P2
 	 
        ;PIPE2
-      movaps xmm11,xmm9     ;
-      shufps xmm11,xmm11,254 ;    1111 1110b -> S3,S3,S3,S2
-      addps xmm9,xmm11     ;    S3,S2,R3,R2 +  S3,S3,S3,S2 = t,t,P3,P2
+     ; movaps xmm11,xmm9     ;
+     ;shufps xmm11,xmm11,254 ;    1111 1110b -> S3,S3,S3,S2
+     ; addps xmm9,xmm11     ;    S3,S2,R3,R2 +  S3,S3,S3,S2 = t,t,P3,P2
 
 	 ;lauflaenge in t zu index
-	 mulps xmm2,xmm8      ;    t,t,P1,P0*factor,factor,factor,factor = t,t,index1,index0
+	; mulps xmm2,xmm8      ;    t,t,P1,P0*factor,factor,factor,factor = t,t,index1,index0
 	 
       ;PIPE2 lauflaenge in t zu index
-      mulps xmm9,xmm8      ;    t,t,P1,P0*factor,factor,factor,factor = t,t,index1,index0
+     ; mulps xmm9,xmm8      ;    t,t,P1,P0*factor,factor,factor,factor = t,t,index1,index0
+	vmulps ymm2,ymm2,ymm8
 
 	 ;time to index for P0
 	 cvtss2si eax,xmm2    ;    index_value0
@@ -1065,9 +1078,10 @@ _as2v_complex:
 	
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	rangecheck_pixel_3:
+vperm2f128 ymm2, ymm2, ymm2, 1
    
    xor rax,rax          ; clear upper part of RAX for later EAX -> RAX (for delta on memory access)
-	 cvtss2si eax,xmm9	; index_value
+	 cvtss2si eax,xmm2	; index_value
 
 	 cmp eax,dword [rsp+128]	;n_Ascan *5   ;cmp eax,[rsp+120]    ;n_Ascan
 	 jge outrange_xsum3	;0....2999
@@ -1123,8 +1137,8 @@ _as2v_complex:
 	rangecheck_pixel_4:
    
    xor rax,rax          ; clear upper part of RAX for later EAX -> RAX (for delta on memory access)
-	 shufps xmm9,xmm9,85	; 0101 0101b -> P1,P1,P1,P1
-	 cvtss2si eax,xmm9	; index_value
+	 shufps xmm2,xmm2,85	; 0101 0101b -> P1,P1,P1,P1
+	 cvtss2si eax,xmm2	; index_value
 
 	 cmp eax,dword [rsp+128]	;n_Ascan *5   ;cmp eax,[rsp+120]    ;n_Ascan
 	 jge outrange_xsum4	;0....2999
